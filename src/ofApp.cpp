@@ -1,4 +1,5 @@
 #include "ofApp.h"
+#include "ofAppGlutWindow.h"
 
 using namespace std;
 //--------------------------------------------------------------
@@ -30,6 +31,13 @@ void ofApp::setup() {
 	for (int i = 1; i < 2; i++) {
 		fs.push_back(FireBall(ofGetWidth() / i, ofGetHeight() / i));
 	}
+
+	selectedCorner = -1;
+	corners[0].set(0, 0);
+	corners[1].set(camera.getWidth(), 0);
+	corners[2].set(camera.getWidth(), camera.getHeight());
+	corners[3].set(0, camera.getHeight());
+
 }
 
 //--------------------------------------------------------------
@@ -67,6 +75,40 @@ void ofApp::update() {
 		grayDiff.absDiff(grayBg, grayImage);
 		//画像を2値化(白と黒だけに)する
 		grayDiff.threshold(threshold);
+	
+
+		for (int i = 0; i < 5; i++) {
+			grayDiff.erode();
+		}
+		
+		for (int i = 0; i < 10; i++) {
+			grayDiff.dilate();
+		}
+
+		for (int i = 0; i < 5; i++) {
+			grayDiff.erode();
+		}
+
+		/*
+
+		for (int i = 0; i < 30; i++) {
+			grayDiff.dilate();
+		}
+		/*
+		for (int i = 0; i < 3; i++) {
+			grayDiff.erode();
+		}
+		*/
+		/*
+		for (int i = 0; i < 5; i++) {
+			grayDiff.erode();
+		}
+		for (int i = 0; i < 5; i++) {
+			grayDiff.dilate();
+		}
+		*/
+	
+
 		//2値化した画像から輪郭を抽出する
 		contourFinder.findContours(grayDiff, 25, grayDiff.width * grayDiff.height, 10, false, false);
 
@@ -173,6 +215,14 @@ void ofApp::draw() {
 		}
 	}
 
+	ofTranslate(30, 30);
+	ofxQuadWarp(maskImage, corners[0], corners[1], corners[2], corners[3], 40, 40);
+
+	for (int i = 0; i<4; i++) {
+		ofCircle(corners[i], 10);
+	}
+
+
 	//ログと操作説明を表示
 	ofSetColor(255, 255, 255);
 	ofDrawBitmapString("FPS: " + ofToString(ofGetFrameRate()), 20, 20);
@@ -256,17 +306,22 @@ void ofApp::mouseMoved(int x, int y) {
 
 //--------------------------------------------------------------
 void ofApp::mouseDragged(int x, int y, int button) {
-
+	corners[selectedCorner].set(x - 30, y - 30);
 }
 
 //--------------------------------------------------------------
 void ofApp::mousePressed(int x, int y, int button) {
-
+	selectedCorner = -1;
+	for (int i = 0; i<4; i++) {
+		if (ofDist(corners[i].x, corners[i].y, x - 30, y - 30)<10) {
+			selectedCorner = i;
+		}
+	}
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseReleased(int x, int y, int button) {
-
+	selectedCorner = -1;
 }
 
 //--------------------------------------------------------------
@@ -292,6 +347,51 @@ void ofApp::gotMessage(ofMessage msg) {
 //--------------------------------------------------------------
 void ofApp::dragEvent(ofDragInfo dragInfo) {
 
+}
+
+ofPoint ofApp::ofxLerp(ofPoint start, ofPoint end, float amt) {
+	return start + amt * (end - start);
+}
+
+//--------------------------------------------------------------
+int ofApp::ofxIndex(float x, float y, float w) {
+	return y*w + x;
+}
+
+//--------------------------------------------------------------
+void ofApp::ofxQuadWarp(ofBaseHasTexture &tex, ofPoint lt, ofPoint rt, ofPoint rb, ofPoint lb, int rows, int cols) {
+
+	float tw = tex.getTexture().getWidth();//.getTextureReference().getWidth();
+	float th = tex.getTexture().getHeight();//getTextureReference().getHeight();
+
+	ofMesh mesh;
+
+	for (int x = 0; x <= cols; x++) {
+		float f = float(x) / cols;
+		ofPoint vTop(ofxLerp(lt, rt, f));
+		ofPoint vBottom(ofxLerp(lb, rb, f));
+		ofPoint tTop(ofxLerp(ofPoint(0, 0), ofPoint(tw, 0), f));
+		ofPoint tBottom(ofxLerp(ofPoint(0, th), ofPoint(tw, th), f));
+
+		for (int y = 0; y <= rows; y++) {
+			float f = float(y) / rows;
+			ofPoint v = ofxLerp(vTop, vBottom, f);
+			mesh.addVertex(v);
+			mesh.addTexCoord(ofxLerp(tTop, tBottom, f));
+		}
+	}
+
+	for (float y = 0; y<rows; y++) {
+		for (float x = 0; x<cols; x++) {
+			mesh.addTriangle(ofxIndex(x, y, cols + 1), ofxIndex(x + 1, y, cols + 1), ofxIndex(x, y + 1, cols + 1));
+			mesh.addTriangle(ofxIndex(x + 1, y, cols + 1), ofxIndex(x + 1, y + 1, cols + 1), ofxIndex(x, y + 1, cols + 1));
+		}
+	}
+
+	tex.getTexture().bind();
+	mesh.draw();
+	tex.getTexture().unbind();
+	mesh.drawVertices();
 }
 
 ofImage Particle::img;

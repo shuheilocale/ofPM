@@ -9,6 +9,11 @@ class FireBall;
 class ofApp : public ofBaseApp {
 
 public:
+	
+	ofPoint corners[4];
+	int selectedCorner;
+
+
 	void setup();
 	void update();
 	void draw();
@@ -24,6 +29,10 @@ public:
 	void windowResized(int w, int h);
 	void dragEvent(ofDragInfo dragInfo);
 	void gotMessage(ofMessage msg);
+
+	ofPoint ofxLerp(ofPoint start, ofPoint end, float amt);
+	int ofxIndex(float x, float y, float w);
+	void ofxQuadWarp(ofBaseHasTexture &tex, ofPoint lt, ofPoint rt, ofPoint rb, ofPoint lb, int rows, int cols);
 
 private:
 	ofVideoGrabber camera;
