@@ -1,14 +1,20 @@
 #pragma once
 #pragma warning(disable:4819)
 #include "ofMain.h"
+#include "ofxQuadWarp.h"
 #include "ofxOpenCv.h"
+#include "fireBall.h"
+#include "aura.h"
 #include <vector>
 
 
-class FireBall;
 class ofApp : public ofBaseApp {
 
 public:
+
+	static const unsigned int WINDOW_W = 640;
+	static const unsigned int WINDOW_H = 480;
+
 	
 	ofPoint corners[4];
 	int selectedCorner;
@@ -32,55 +38,40 @@ public:
 
 	ofPoint ofxLerp(ofPoint start, ofPoint end, float amt);
 	int ofxIndex(float x, float y, float w);
-	void ofxQuadWarp(ofBaseHasTexture &tex, ofPoint lt, ofPoint rt, ofPoint rb, ofPoint lb, int rows, int cols);
+	void ofxQuadWarp_(ofBaseHasTexture &tex, ofPoint lt, ofPoint rt, ofPoint rb, ofPoint lb, int rows, int cols);
+	void drawAura();
 
 private:
 	ofVideoGrabber camera;
 	ofxCvColorImage colorImage;
 	ofxCvColorImage maskImage;
 	ofxCvGrayscaleImage grayImage, edgeImage;
-	ofxCvGrayscaleImage grayBg; //ƒLƒƒƒvƒ`ƒƒ[‚µ‚½”wŒi‰æ‘œ
-	ofxCvGrayscaleImage grayDiff; //Œ»İ‚Ì‰æ‘œ‚Æ”wŒi‚Æ‚Ì·•ª
-	ofxCvContourFinder contourFinder; //—ÖŠs’Šo‚Ì‚½‚ß‚ÌƒNƒ‰ƒX
+	ofxCvGrayscaleImage grayBg; //ã‚­ãƒ£ãƒ—ãƒãƒ£ãƒ¼ã—ãŸèƒŒæ™¯ç”»åƒ
+	ofxCvGrayscaleImage grayDiff; //ç¾åœ¨ã®ç”»åƒã¨èƒŒæ™¯ã¨ã®å·®åˆ†
+	ofxCvContourFinder contourFinder; //è¼ªéƒ­æŠ½å‡ºã®ãŸã‚ã®ã‚¯ãƒ©ã‚¹
+	int maxid; // è¼ªéƒ­æŠ½å‡ºã®æœ€å¤§é¢ç©ã‚’æ ¼ç´ã—ãŸç•ªå·ï¼ˆ1ãƒ•ãƒ¬ãƒ¼ãƒ æ¯ã«æ›´æ–°ï¼‰
+	float ratioW, ratioH;
+	ofFbo displayfbo;
 
-	bool bLearnBakground; //”wŒi‰æ‘œ‚ğ“o˜^‚µ‚½‚©”Û‚©
-	bool showCvAnalysis; //‰ğÍŒ‹‰Ê‚ğ•\¦‚·‚é‚©
-	int threshold; //2’l‰»‚ÌÛ‚Ì•~‹’l
-	int videoMode; //•\¦‚·‚é‰æ‘œ‚ğ‘I‘ğ
+	bool bLearnBakground; //èƒŒæ™¯ç”»åƒã‚’ç™»éŒ²ã—ãŸã‹å¦ã‹
+	bool showCvAnalysis; //è§£æçµæœã‚’è¡¨ç¤ºã™ã‚‹ã‹
+	bool showFullScreen; //ãƒ•ãƒ«ã‚¹ã‚¯ãƒªãƒ¼ãƒ³
+	bool showBenchmark;
+	int threshold; //2å€¤åŒ–ã®éš›ã®æ•·å±…å€¤
+	int videoMode; //è¡¨ç¤ºã™ã‚‹ç”»åƒã‚’é¸æŠ
 
-	vector<FireBall> fs;
-};
+	vector<FireBall> fs; 
+	vector<Aura> aura; //!< Kimrepo
 
+	int invisiCol;
 
-class Particle {
-private:
+	ofShader shaderBlurX;
+	ofShader shaderBlurY;
 
-	static ofImage img; // ƒp[ƒeƒBƒNƒ‹‚Ì‰æ‘œ‚ğ“Ç‚İ‚Ş
-	ofPoint p; // ˆÊ’u
-	ofPoint v; // ‘¬“x
-	ofPoint c; // ‰Š©‘Ì‚Ì’†SˆÊ’u
-	float size; // ‰Š‚Ì‘å‚«‚³
-	int lt = 40; //Á‚¦‚é‚Ü‚Å‚ÌŠÔ
+	ofFbo drawParticles;
+	ofFbo fboBlurOnePass;
+	ofFbo fboBlurTwoPass;
 
-public:
-	Particle() {};
-	Particle(ofPoint _p, float _size);
+	ofxQuadWarp warper;
 
-	static void setup();
-	void update();
-	void draw();
-	bool isDead();
-};
-
-class FireBall {
-	std::vector<Particle> ps; // ƒp[ƒeƒBƒNƒ‹‚Ì”z—ñ
-	ofPoint pos; // ‰Š‚ÌˆÊ’u
-	float size; // ‰Š‚Ì‘å‚«‚³
-public:
-	FireBall() {};
-	FireBall(float x, float y);
-	void setup();
-	void update();
-	void update(ofPoint _pos);
-	void draw();
 };

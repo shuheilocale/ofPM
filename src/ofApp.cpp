@@ -1,33 +1,72 @@
 #include "ofApp.h"
 #include "ofAppGlutWindow.h"
+#include "fireBall.h"
+#include "aura.h"
 
 using namespace std;
 //--------------------------------------------------------------
 void ofApp::setup() {
+
+	// for aura
+	ofSetVerticalSync(true);
+	ofDisableBlendMode();
+	ofEnableBlendMode(OF_BLENDMODE_ADD);
+
+	for (int i = 0; i < 25000; i++) {
+		Aura auraCore;
+		auraCore.setInitCondition(ofRandom(WINDOW_W), ofRandom(WINDOW_H), 0, 0);
+		auraCore.damping = ofRandom(0.01, 0.05);
+		aura.push_back(auraCore);
+	}
+
+#ifdef TARGET_OPENGLES
+	shaderBlurX.load("shadersES2/shaderBlurX");
+	shaderBlurY.load("shadersES2/shaderBlurY");
+#else
+	if (ofIsGLProgrammableRenderer()) {
+		shaderBlurX.load("shadersGL3/shaderBlurX");
+		shaderBlurY.load("shadersGL3/shaderBlurY");
+	}
+	else {
+		shaderBlurX.load("shadersGL2/shaderBlurX");
+		shaderBlurY.load("shadersGL2/shaderBlurY");
+	}
+#endif
+
+
+
+	fboBlurOnePass.allocate(ofGetWindowWidth(), ofGetWindowHeight(), GL_RGBA);
+	fboBlurTwoPass.allocate(ofGetWindowWidth(), ofGetWindowHeight(), GL_RGBA);
+	drawParticles.allocate(ofGetWindowWidth(), ofGetWindowHeight(), GL_RGBA);
+
+
+	// basic setting
+
 	// window
 	ofBackground(0, 0, 0);
 	ofEnableAlphaBlending();
 	ofSetFrameRate(60);
 
-	//ƒJƒƒ‰‚©‚ç‰f‘œ‚ğæ‚è‚ñ‚Å•\¦
+	//ã‚«ãƒ¡ãƒ©ã‹ã‚‰æ˜ åƒã‚’å–ã‚Šè¾¼ã‚“ã§è¡¨ç¤º
 	camera.setVerbose(true);
-	camera.initGrabber(640, 480);
+	camera.initGrabber(WINDOW_W, WINDOW_H);
 
-	//g—p‚·‚é‰æ‘œ‚Ì—Ìˆæ‚ğŠm•Û
-	colorImage.allocate(640, 480);
-	grayImage.allocate(640, 480);
-	grayBg.allocate(640, 480);
-	grayDiff.allocate(640, 480);
+	//ä½¿ç”¨ã™ã‚‹ç”»åƒã®é ˜åŸŸã‚’ç¢ºä¿
+	colorImage.allocate(WINDOW_W, WINDOW_H);
+	grayImage.allocate(WINDOW_W, WINDOW_H);
+	grayBg.allocate(WINDOW_W, WINDOW_H);
+	grayDiff.allocate(WINDOW_W, WINDOW_H);
+	// todo â†‘ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦å¼•ãä¼¸ã°ã—ã«å¯¾å¿œ
 
-	//•Ï”‚Ì‰Šú‰»
+	//å¤‰æ•°ã®åˆæœŸåŒ–
 	bLearnBakground = true;
 	showCvAnalysis = false;
+	showFullScreen = false;
+	showBenchmark = false;
 	threshold = 20;
 	videoMode = 0;
-
-	ofEnableAlphaBlending();
-
-	Particle::setup();
+	
+	ParticleOrb::setup();
 	for (int i = 1; i < 2; i++) {
 		fs.push_back(FireBall(ofGetWidth() / i, ofGetHeight() / i));
 	}
@@ -38,6 +77,29 @@ void ofApp::setup() {
 	corners[2].set(camera.getWidth(), camera.getHeight());
 	corners[3].set(0, camera.getHeight());
 
+
+	printf("ogww:%f, ogww:%f\n", ofGetWidth(), ofGetWindowWidth());
+
+	int x = (ofGetWidth() - camera.getWidth()) * 0.5;       // center on screen.
+	int y = (ofGetHeight() - camera.getHeight()) * 0.5;     // center on screen.
+	//int x = ofGetWindowWidth() * 0.5;
+	//int y = ofGetWindowHeight() * 0.5;
+	//int w = camera.getWidth();
+	//int h = camera.getHeight();
+	int w = ofGetWindowWidth();
+	int h = ofGetWindowHeight();
+
+	displayfbo.allocate(ofGetWindowWidth(), ofGetWindowHeight());
+
+	warper.setSourceRect(ofRectangle(0, 0, w, h));              // this is the source rectangle which is the size of the image and located at ( 0, 0 )
+	warper.setTopLeftCornerPosition(ofPoint(x, y));             // this is position of the quad warp corners, centering the image on the screen.
+	warper.setTopRightCornerPosition(ofPoint(x + w, y));        // this is position of the quad warp corners, centering the image on the screen.
+	warper.setBottomLeftCornerPosition(ofPoint(x, y + h));      // this is position of the quad warp corners, centering the image on the screen.
+	warper.setBottomRightCornerPosition(ofPoint(x + w, y + h)); // this is position of the quad warp corners, centering the image on the screen.
+	warper.setup();
+	warper.load(); // reload last saved changes.
+
+
 }
 
 //--------------------------------------------------------------
@@ -47,33 +109,33 @@ void ofApp::update() {
 		it->update();
 	}
 
-	//V‹KƒtƒŒ[ƒ€‚Ìæ‚è‚İ‚ğƒŠƒZƒbƒg
+	//æ–°è¦ãƒ•ãƒ¬ãƒ¼ãƒ ã®å–ã‚Šè¾¼ã¿ã‚’ãƒªã‚»ãƒƒãƒˆ
 	bool bNewFrame = false;
 
-	//ƒJƒƒ‰g—p‚Ìê‡‚ÍƒJƒƒ‰‚©‚çV‹KƒtƒŒ[ƒ€æ‚è‚İ
+	//ã‚«ãƒ¡ãƒ©ä½¿ç”¨ã®å ´åˆã¯ã‚«ãƒ¡ãƒ©ã‹ã‚‰æ–°è¦ãƒ•ãƒ¬ãƒ¼ãƒ å–ã‚Šè¾¼ã¿
 	camera.update();
-	//V‹K‚ÉƒtƒŒ[ƒ€‚ªØ‚è‘Ö‚í‚Á‚½‚©”»’è
+	//æ–°è¦ã«ãƒ•ãƒ¬ãƒ¼ãƒ ãŒåˆ‡ã‚Šæ›¿ã‚ã£ãŸã‹åˆ¤å®š
 	bNewFrame = camera.isFrameNew();
 
-	//ƒtƒŒ[ƒ€‚ªØ‚è‘Ö‚í‚Á‚½Û‚Ì‚İ‰æ‘œ‚ğ‰ğÍ
+	//ãƒ•ãƒ¬ãƒ¼ãƒ ãŒåˆ‡ã‚Šæ›¿ã‚ã£ãŸéš›ã®ã¿ç”»åƒã‚’è§£æ
 	if (bNewFrame) {
-		//æ‚è‚ñ‚¾ƒtƒŒ[ƒ€‚ğ‰æ‘œ‚Æ‚µ‚ÄƒLƒƒƒvƒ`ƒƒ
-		colorImage.setFromPixels(camera.getPixels(), 640, 480);
-		//¶‰E”½“]
-		colorImage.mirror(false, true);
+		//å–ã‚Šè¾¼ã‚“ã ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’ç”»åƒã¨ã—ã¦ã‚­ãƒ£ãƒ—ãƒãƒ£
+		colorImage.setFromPixels(camera.getPixels(), WINDOW_W, WINDOW_H);
+		//å·¦å³åè»¢
+		colorImage.mirror(false, false);
 
-		//ƒJƒ‰[‚ÌƒCƒ[ƒW‚ğƒOƒŒ[ƒXƒP[ƒ‹‚É•ÏŠ·
+		//ã‚«ãƒ©ãƒ¼ã®ã‚¤ãƒ¡ãƒ¼ã‚¸ã‚’ã‚°ãƒ¬ãƒ¼ã‚¹ã‚±ãƒ¼ãƒ«ã«å¤‰æ›
 		grayImage = colorImage;
 
-		//‚Ü‚¾”wŒi‰æ‘œ‚ª‹L˜^‚³‚ê‚Ä‚¢‚È‚¯‚ê‚ÎAŒ»İ‚ÌƒtƒŒ[ƒ€‚ğ”wŒi‰æ‘œ‚Æ‚·‚é
+		//ã¾ã èƒŒæ™¯ç”»åƒãŒè¨˜éŒ²ã•ã‚Œã¦ã„ãªã‘ã‚Œã°ã€ç¾åœ¨ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’èƒŒæ™¯ç”»åƒã¨ã™ã‚‹
 		if (bLearnBakground == true) {
 			grayBg = grayImage;
 			bLearnBakground = false;
 		}
 
-		//ƒOƒŒ[ƒXƒP[ƒ‹‚ÌƒCƒ[ƒW‚Ææ‚è‚ñ‚¾”wŒi‰æ‘œ‚Æ‚Ì·•ª‚ğZo
+		//ã‚°ãƒ¬ãƒ¼ã‚¹ã‚±ãƒ¼ãƒ«ã®ã‚¤ãƒ¡ãƒ¼ã‚¸ã¨å–ã‚Šè¾¼ã‚“ã èƒŒæ™¯ç”»åƒã¨ã®å·®åˆ†ã‚’ç®—å‡º
 		grayDiff.absDiff(grayBg, grayImage);
-		//‰æ‘œ‚ğ2’l‰»(”’‚Æ•‚¾‚¯‚É)‚·‚é
+		//ç”»åƒã‚’2å€¤åŒ–(ç™½ã¨é»’ã ã‘ã«)ã™ã‚‹
 		grayDiff.threshold(threshold);
 	
 
@@ -89,34 +151,27 @@ void ofApp::update() {
 			grayDiff.erode();
 		}
 
-		/*
 
-		for (int i = 0; i < 30; i++) {
-			grayDiff.dilate();
-		}
-		/*
-		for (int i = 0; i < 3; i++) {
-			grayDiff.erode();
-		}
-		*/
-		/*
-		for (int i = 0; i < 5; i++) {
-			grayDiff.erode();
-		}
-		for (int i = 0; i < 5; i++) {
-			grayDiff.dilate();
-		}
-		*/
-	
 
-		//2’l‰»‚µ‚½‰æ‘œ‚©‚ç—ÖŠs‚ğ’Šo‚·‚é
+		//2å€¤åŒ–ã—ãŸç”»åƒã‹ã‚‰è¼ªéƒ­ã‚’æŠ½å‡ºã™ã‚‹
 		contourFinder.findContours(grayDiff, 25, grayDiff.width * grayDiff.height, 10, false, false);
+		float maxarea = 0.0;
+		maxid = -1;
+		for (int i = 0; i < contourFinder.nBlobs; i++) {
+			if (maxarea < contourFinder.blobs[i].area) {
+				maxarea = contourFinder.blobs[i].area;
+				maxid = i;
+			}
+		}
 
+		if (maxid >= 0) {
+			//printf("x:%f,y:%f\n", contourFinder.blobs[maxid].centroid.x, contourFinder.blobs[maxid].centroid.y);
+		}
 
 		unsigned char *diffPixs = grayDiff.getPixels();
 		unsigned char *colorPixs = colorImage.getPixels();
 
-		int nPixs = 640 * 480;
+		int nPixs = WINDOW_W * WINDOW_H;
 
 		unsigned char* compositeImgPixels = new unsigned char[nPixs * 3];
 		
@@ -126,7 +181,7 @@ void ofApp::update() {
 				compositeImgPixels[3*i+1] = colorPixs[3*i+1];
 				compositeImgPixels[3*i+2] = colorPixs[3*i+2];
 
-				//fs.push_back(FireBall(nPixs % 640, nPixs / 640));
+				//fs.push_back(FireBall(nPixs % WINDOW_W, nPixs / WINDOW_W));
 
 			}else{
 				compositeImgPixels[3*i] = 0;
@@ -137,7 +192,7 @@ void ofApp::update() {
 			}
 		}
 		
-		maskImage.setFromPixels(compositeImgPixels, 640, 480);
+		maskImage.setFromPixels(compositeImgPixels, WINDOW_W, WINDOW_H);
 
 		delete[] compositeImgPixels;
 
@@ -159,137 +214,292 @@ void ofApp::update() {
 //--------------------------------------------------------------
 void ofApp::draw() {
 
+	ofMatrix4x4 mat = warper.getMatrix();
 
 
-	//Œ»İ‚Ìƒ‚[ƒh‚É‰‚¶‚ÄA•\¦‚·‚é‰f‘œ‚ğØ‚è‘Ö‚¦
+	displayfbo.begin();
+
+	//ç¾åœ¨ã®ãƒ¢ãƒ¼ãƒ‰ã«å¿œã˜ã¦ã€è¡¨ç¤ºã™ã‚‹æ˜ åƒã‚’åˆ‡ã‚Šæ›¿ãˆ
 	switch (videoMode) {
 
 	case 1:
-		//ƒOƒŒ[ƒXƒP[ƒ‹‰f‘œ
-		grayImage.draw(0, 0, ofGetWidth(), ofGetHeight());
+		//ã‚°ãƒ¬ãƒ¼ã‚¹ã‚±ãƒ¼ãƒ«æ˜ åƒ
+		grayImage.draw(0, 0);//(0, 0, ofGetWidth(), ofGetHeight());
 		break;
 
 	case 2:
-		//”wŒi‰æ‘œ
-		grayBg.draw(0, 0, ofGetWidth(), ofGetHeight());
+		//èƒŒæ™¯ç”»åƒ
+		grayBg.draw(0, 0);//(0, 0, ofGetWidth(), ofGetHeight());
 		break;
 
 	case 3:
-		//2’l‰»‚³‚ê‚½·•ª‰f‘œ
-		grayDiff.draw(0, 0, ofGetWidth(), ofGetHeight());
+		//2å€¤åŒ–ã•ã‚ŒãŸå·®åˆ†æ˜ åƒ
+		grayDiff.draw(0, 0);//(0, 0, ofGetWidth(), ofGetHeight());
 		break;
 
 	case 4:
-		//·•ª‚ÌƒOƒŒ[ƒX[ƒPƒ‹
-		maskImage.draw(0, 0, ofGetWidth(), ofGetHeight());
+		//å·®åˆ†ã®ã‚°ãƒ¬ãƒ¼ã‚¹ãƒ¼ã‚±ãƒ«
+		maskImage.draw(0, 0);//(0, 0, ofGetWidth(), ofGetHeight());
 		break;
 
+	case 5:
+		colorImage.draw(0, 0);//(0, 0, ofGetWidth(), ofGetHeight());
+		drawAura();
+		break;
+	case 6:
+		ofBackground(0, 0, 0);
+		drawAura();
+		break;
 	default:
-		//ƒJƒ‰[‰f‘œ
-		colorImage.draw(0, 0, ofGetWidth(), ofGetHeight());
+		//ã‚«ãƒ©ãƒ¼æ˜ åƒ
+		colorImage.draw(0, 0);//(0, 0, ofGetWidth(), ofGetHeight());
+
+		for (vector<FireBall>::iterator it = fs.begin(); it != fs.end(); ++it) {
+			it->draw();
+		}
 		break;
 	}
 
-	for (vector<FireBall>::iterator it = fs.begin(); it != fs.end(); ++it) {
-		it->draw();
-	}
+	//ç”»é¢ã«å¯¾ã™ã‚‹æ˜ åƒã®æ¯”ç‡ã‚’è¨ˆç®—
+	float ratioX = ofGetWidth() / WINDOW_W;
+	float ratioY = ofGetHeight() / WINDOW_H;
 
-
-	//‰æ–Ê‚É‘Î‚·‚é‰f‘œ‚Ì”ä—¦‚ğŒvZ
-	float ratioX = ofGetWidth() / 640;
-	float ratioY = ofGetHeight() / 480;
-
-	//‰ğÍŒ‹‰Ê‚ğ•\¦‚·‚éê‡
+	//è§£æçµæœã‚’è¡¨ç¤ºã™ã‚‹å ´åˆ
 	if (showCvAnalysis) {
-		//ŒŸo‚µ‚½‰ğÍŒ‹‰Ê‚ğ•\¦
-		for (int i = 0; i < contourFinder.nBlobs; i++) {
-			ofPushMatrix();//‰æ–ÊƒTƒCƒY‚¢‚Á‚Ï‚¢‚É•\¦‚³‚ê‚é‚æ‚¤ƒŠƒXƒP[ƒ‹
+		if (maxid >= 0) {
+			ofPushMatrix();//ç”»é¢ã‚µã‚¤ã‚ºã„ã£ã±ã„ã«è¡¨ç¤ºã•ã‚Œã‚‹ã‚ˆã†ãƒªã‚¹ã‚±ãƒ¼ãƒ«
+			glScalef(ratioX, ratioY,1.0f);
+			contourFinder.blobs[maxid].draw(0, 0);
+			//ofFill();
+			ofSetColor(255, 0, 0);
+			ofEllipse(contourFinder.blobs[maxid].centroid.x*ratioW, contourFinder.blobs[maxid].centroid.y*ratioW, 4, 4);
+			ofPopMatrix();
+		}
+
+		//æ¤œå‡ºã—ãŸè§£æçµæœã‚’è¡¨ç¤º
+		/*for (int i = 0; i < contourFinder.nBlobs; i++) {
+			
+			
+			ofPushMatrix();//ç”»é¢ã‚µã‚¤ã‚ºã„ã£ã±ã„ã«è¡¨ç¤ºã•ã‚Œã‚‹ã‚ˆã†ãƒªã‚¹ã‚±ãƒ¼ãƒ«
 			glScalef((float)ofGetWidth() / (float)grayDiff.width,
 				(float)ofGetHeight() / (float)grayDiff.height,
 				1.0f);
 			contourFinder.blobs[i].draw(0, 0);
-			ofFill();
+			//ofFill();
 			ofSetColor(255, 0, 0);
 			ofEllipse(contourFinder.blobs[i].centroid.x, contourFinder.blobs[i].centroid.y, 4, 4);
 			ofPopMatrix();
 		}
+		*/
 	}
 
-	ofTranslate(30, 30);
-	ofxQuadWarp(maskImage, corners[0], corners[1], corners[2], corners[3], 40, 40);
+	displayfbo.end();
 
-	for (int i = 0; i<4; i++) {
-		ofCircle(corners[i], 10);
-	}
+	ofPushMatrix();
+	ofMultMatrix(mat);
+	displayfbo.draw(0, 0);
+	ofPopMatrix();
 
 
-	//ƒƒO‚Æ‘€ìà–¾‚ğ•\¦
+	
+	ofSetColor(ofColor::magenta);
+	warper.drawQuadOutline();
+
+	ofSetColor(ofColor::yellow);
+	warper.drawCorners();
+
+	ofSetColor(ofColor::magenta);
+	warper.drawHighlightedCorner();
+
+	ofSetColor(ofColor::red);
+	warper.drawSelectedCorner();
+	
 	ofSetColor(255, 255, 255);
-	ofDrawBitmapString("FPS: " + ofToString(ofGetFrameRate()), 20, 20);
-	ofDrawBitmapString("Threshold: " + ofToString(threshold), 20, 35);
-	ofDrawBitmapString("Number of Blobs: " + ofToString(contourFinder.nBlobs), 20, 50);
-	ofDrawBitmapString("[0] Show original video", 20, 65);
-	ofDrawBitmapString("[1] Show grayscale video", 20, 80);
-	ofDrawBitmapString("[2] Show captured background", 20, 95);
-	ofDrawBitmapString("[3] Show difference from background", 20, 110);
-	ofDrawBitmapString("[space] Captuer background", 20, 125);
-	ofDrawBitmapString("[a] Analysis on / off", 20, 140);
+
+	if (showBenchmark) {
+		//ãƒ­ã‚°ã¨æ“ä½œèª¬æ˜ã‚’è¡¨ç¤º
+		ofDrawBitmapString("FPS: " + ofToString(ofGetFrameRate()), 20, 20);
+		ofDrawBitmapString("Threshold: " + ofToString(threshold), 20, 35);
+		ofDrawBitmapString("Number of Blobs: " + ofToString(contourFinder.nBlobs), 20, 50);
+		ofDrawBitmapString("[0] Show original video", 20, 65);
+		ofDrawBitmapString("[1] Show grayscale video", 20, 80);
+		ofDrawBitmapString("[2] Show captured background", 20, 95);
+		ofDrawBitmapString("[3] Show difference from background", 20, 110);
+		ofDrawBitmapString("[space] Captuer background", 20, 125);
+		ofDrawBitmapString("[a] Analysis on / off", 20, 140);
+	}
+}
+void ofApp::drawAura() {
+
+	drawParticles.begin();
+
+	ofSetColor(0);
+	//ofRect (0, 0, ofGetWindowWidth(), ofGetWindowHeight());
+	ofClear(0, 0);
+
+	int i = 0;
+	float x = 0.0, y = 0.0;
+	for (vector<Aura>::iterator it = aura.begin(); it != aura.end(); it++) {
+
+		it->resetForce();
+		//it->addAttraction(thisMouseX, thisMouseY, 1000, 0.05);
+		//it->addRepulsion(thisMouseX, thisMouseY, 50, 80);
+
+		if (contourFinder.blobs.size() > 0) {
+
+			x = contourFinder.blobs[maxid].centroid.x * ratioW;
+			y = contourFinder.blobs[maxid].centroid.y * ratioH;
+			it->addAttraction(x, y, 1000, 0.2);
+		//	it->addRepulsion(contourFinder.blobs[maxid].centroid.x, contourFinder.blobs[maxid].centroid.y, 50, 80);
+			it->addRepulsion(&grayDiff, &contourFinder.blobs[maxid], 50, 40);
+		}
+		//it->addRepulsion(thisMouseX, thisMouseY, 50, 80);
+		it->addDamping();
+		it->update();
+
+		if (i == 0) {
+			if (contourFinder.blobs.size() > 0) {
+				x = contourFinder.blobs[maxid].centroid.x * ratioW;
+				y = contourFinder.blobs[maxid].centroid.y * ratioH;
+				it->trail(contourFinder.blobs[maxid].centroid.x, contourFinder.blobs[maxid].centroid.y);
+			}
+			//it->trail(thisMouseX, thisMouseY);
+		}
+		else {
+			it->trail(aura[i - 1].pos.x * ratioW, aura[i - 1].pos.y * ratioH);
+		}
+
+		it->draw();
+
+		i++;
+	}
+
+	drawParticles.end();
+
+	fboBlurOnePass.begin();
+
+	ofClear(0, 0);
+
+	shaderBlurX.begin();
+	shaderBlurX.setUniform1f("blurAmnt", 1.25);
+
+	ofSetColor(255);
+	drawParticles.draw(0, 0);
+
+
+	shaderBlurX.end();
+
+	fboBlurOnePass.end();
+
+	fboBlurTwoPass.begin();
+
+	ofClear(0, 0);
+
+	shaderBlurY.begin();
+	shaderBlurY.setUniform1f("blurAmnt", 1.25);
+
+	ofSetColor(255);
+	fboBlurOnePass.draw(0, 0);
+
+	shaderBlurY.end();
+
+	fboBlurTwoPass.end();
+
+
+	ofSetColor(255);
+	fboBlurTwoPass.draw(0, 0);
+	//ofDrawBitmapString(ofToString(ofGetFrameRate()), 10, 10);
 
 }
 
+
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key) {
-	//ƒL[“ü—Í‚Åƒ‚[ƒhØ‚è‘Ö‚¦
+	//ã‚­ãƒ¼å…¥åŠ›ã§ãƒ¢ãƒ¼ãƒ‰åˆ‡ã‚Šæ›¿ãˆ
 	switch (key) {
 	case '0':
-		//ƒJƒ‰[‰f‘œ•\¦
+		//ã‚«ãƒ©ãƒ¼æ˜ åƒè¡¨ç¤º
 		videoMode = 0;
 		break;
 
 	case '1':
-		//ƒOƒŒ[ƒXƒP[ƒ‹‰f‘œ•\¦
+		//ã‚°ãƒ¬ãƒ¼ã‚¹ã‚±ãƒ¼ãƒ«æ˜ åƒè¡¨ç¤º
 		videoMode = 1;
 		break;
 
 	case '2':
-		//”wŒi‰æ‘œ•\¦
+		//èƒŒæ™¯ç”»åƒè¡¨ç¤º
 		videoMode = 2;
 		break;
 
 	case '3':
-		//2’l‰»‚µ‚½·•ª‰f‘œ
+		//2å€¤åŒ–ã—ãŸå·®åˆ†æ˜ åƒ
 		videoMode = 3;
 		break;
 
 	case '4':
 		videoMode = 4;
 		break;
-
+	case '5':
+		// aura
+		aura.clear();
+		for (int i = 0; i < 25000; i++) {
+			Aura auraCore;
+			auraCore.setInitCondition(ofRandom(WINDOW_W), ofRandom(WINDOW_H), 0, 0);
+			auraCore.damping = ofRandom(0.01, 0.05);
+			aura.push_back(auraCore);
+		}
+		videoMode = 5;
+		break;
+	case '6':
+		// aura
+		aura.clear();
+		for (int i = 0; i < 25000; i++) {
+			Aura auraCore;
+			auraCore.setInitCondition(ofRandom(WINDOW_W), ofRandom(WINDOW_H), 0, 0);
+			auraCore.damping = ofRandom(0.01, 0.05);
+			aura.push_back(auraCore);
+		}
+		videoMode = 6;
+		break;
 	case 'a':
-		//‰ğÍŒ‹‰Ê‚Ì•\¦‚Ì on / off
+		//è§£æçµæœã®è¡¨ç¤ºã® on / off
 		showCvAnalysis ? showCvAnalysis = false : showCvAnalysis = true;
 		break;
 
 	case 'f':
-		//ƒtƒ‹ƒXƒNƒŠ[ƒ“‚É
-		ofSetFullscreen(true);
+		//ãƒ•ãƒ«ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ã«
+		ofSetFullscreen(showFullScreen);
+		showFullScreen ? showFullScreen = false : showFullScreen = true;
 		break;
-
+	case 'b':
+		//ãƒ™ãƒ³ãƒãƒãƒ¼ã‚¯
+		showBenchmark ? showBenchmark = false : showBenchmark = true;
+		break;
 	case ' ':
-		//”wŒi‰æ‘œ‚ğV‹K‚Éæ‚è‚Ş
+		//èƒŒæ™¯ç”»åƒã‚’æ–°è¦ã«å–ã‚Šè¾¼ã‚€
 		bLearnBakground = true;
 		break;
 
 	case '+':
-		//2’l‰»‚Ìè‡’l‚ğ‘‰Á
+		//2å€¤åŒ–ã®é–¾å€¤ã‚’å¢—åŠ 
 		threshold++;
 		if (threshold > 255) threshold = 255;
 		break;
 
 	case '-':
-		//2’l‰»‚Ìè‡’l‚ğŒ¸­
+		//2å€¤åŒ–ã®é–¾å€¤ã‚’æ¸›å°‘
 		threshold--;
 		if (threshold < 0) threshold = 0;
+		break;
+	case 's':
+		warper.save();
+		break;
+	case 'l':
+		warper.load();
+		break;
+	case 'h':
+		warper.toggleShow();
 		break;
 	}
 }
@@ -336,7 +546,15 @@ void ofApp::mouseExited(int x, int y) {
 
 //--------------------------------------------------------------
 void ofApp::windowResized(int w, int h) {
+	ratioW = w / WINDOW_W;
+	ratioH = h / WINDOW_H;
 
+	/*
+	colorImage.resize(w, h);
+	grayImage.resize(w, h);
+	grayBg.resize(w, h);
+	grayDiff.resize(w, h);
+	*/
 }
 
 //--------------------------------------------------------------
@@ -359,7 +577,7 @@ int ofApp::ofxIndex(float x, float y, float w) {
 }
 
 //--------------------------------------------------------------
-void ofApp::ofxQuadWarp(ofBaseHasTexture &tex, ofPoint lt, ofPoint rt, ofPoint rb, ofPoint lb, int rows, int cols) {
+void ofApp::ofxQuadWarp_(ofBaseHasTexture &tex, ofPoint lt, ofPoint rt, ofPoint rb, ofPoint lb, int rows, int cols) {
 
 	float tw = tex.getTexture().getWidth();//.getTextureReference().getWidth();
 	float th = tex.getTexture().getHeight();//getTextureReference().getHeight();
@@ -393,79 +611,3 @@ void ofApp::ofxQuadWarp(ofBaseHasTexture &tex, ofPoint lt, ofPoint rt, ofPoint r
 	tex.getTexture().unbind();
 	mesh.drawVertices();
 }
-
-ofImage Particle::img;
-
-Particle::Particle(ofPoint _p, float _size) {
-	size = _size;
-	p = _p;
-	v = ofPoint(ofRandom(-1, 1), ofRandom(-1, 1));
-	v = 0.3*size*ofRandom(1)*v.normalize(); //‰Šú‘¬“x0.3
-	c = _p;
-}
-void Particle::setup() {
-	img.loadImage("particle.png");
-}
-
-void Particle::update() {
-	p += v;
-	ofPoint d = p - c;
-	v.x += 0.02*(ofRandom(-1, 1) - 0.05*d.x)*size; // ‚¾‚ñ‚¾‚ñ‚Æ^‚ñ’†‚ÉŠñ‚é‚æ‚¤‚É
-	v.y += -0.02*size; // ã‚É¸‚é‚æ‚¤‚É
-	--lt; // c‚è¶‘¶ŠÔ‚ğŒ¸‚ç‚·
-};
-
-
-void Particle::draw() {
-	img.draw(p, 5 * size, 5 * size);
-};
-
-bool Particle::isDead() {
-	return (lt <= 0);
-}
-
-FireBall::FireBall(float x, float y) {
-	pos = ofPoint(x, y);
-	size = 10; // ‚±‚±‚Å‘å‚«‚³‚ğw’è‚µ‚Ä‚â‚é
-}
-
-void FireBall::update() {
-
-	// ƒp[ƒeƒBƒNƒ‹‚ğ’Ç‰Á
-	for (int i = 0; i<10; ++i)
-		ps.push_back(Particle(pos, size));
-
-	for (vector<Particle>::iterator it = ps.begin(); it != ps.end(); ++it) {
-		it->update();
-	}
-	for (vector<Particle>::iterator it = ps.begin(); it != ps.end(); ++it) {
-		if (it->isDead()) {
-			it = ps.erase(it);
-		}
-	}
-};
-
-void FireBall::update(ofPoint _pos) {
-
-	pos = _pos;
-
-	// ƒp[ƒeƒBƒNƒ‹‚ğ’Ç‰Á
-	for (int i = 0; i<10; ++i)
-		ps.push_back(Particle(pos, size));
-
-	for (vector<Particle>::iterator it = ps.begin(); it != ps.end(); ++it) {
-		it->update();
-	}
-	for (vector<Particle>::iterator it = ps.begin(); it != ps.end(); ++it) {
-		if (it->isDead()) {
-			it = ps.erase(it);
-		}
-	}
-};
-
-
-void FireBall::draw() {
-	for (vector<Particle>::iterator it = ps.begin(); it != ps.end(); ++it) {
-		it->draw();
-	}
-};
