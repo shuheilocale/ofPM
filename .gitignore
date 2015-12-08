@@ -12,8 +12,9 @@
 [Rr]elease/
 x64/
 build/
-[Bb]in/
+[Bb]in/*
 [Oo]bj/
+![Bb]in/data/
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
