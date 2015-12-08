@@ -2,10 +2,15 @@
 #include "ofAppGlutWindow.h"
 #include "fireBall.h"
 #include "aura.h"
+#include "afterimage.h"
+#include "autoBuilder.h"
+#include "cosmo.h"
 
 using namespace std;
 //--------------------------------------------------------------
 void ofApp::setup() {
+
+	ofSetBackgroundAuto(false);
 
 	// for aura
 	ofSetVerticalSync(true);
@@ -24,10 +29,12 @@ void ofApp::setup() {
 	shaderBlurY.load("shadersES2/shaderBlurY");
 #else
 	if (ofIsGLProgrammableRenderer()) {
+		printf("using GL3\n");
 		shaderBlurX.load("shadersGL3/shaderBlurX");
 		shaderBlurY.load("shadersGL3/shaderBlurY");
 	}
 	else {
+		printf("using GL2\n");
 		shaderBlurX.load("shadersGL2/shaderBlurX");
 		shaderBlurY.load("shadersGL2/shaderBlurY");
 	}
@@ -77,6 +84,9 @@ void ofApp::setup() {
 	corners[2].set(camera.getWidth(), camera.getHeight());
 	corners[3].set(0, camera.getHeight());
 
+	cosmo.setup(20000);
+
+	ab.setup(10, ofPoint(ofGetWidth() / 2, ofGetHeight()+10.0), true);
 
 	printf("ogww:%f, ogww:%f\n", ofGetWidth(), ofGetWindowWidth());
 
@@ -139,15 +149,15 @@ void ofApp::update() {
 		grayDiff.threshold(threshold);
 	
 
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < 3; i++) {
 			grayDiff.erode();
 		}
 		
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 6; i++) {
 			grayDiff.dilate();
 		}
 
-		for (int i = 0; i < 5; i++) {
+		for (int i = 0; i < 3; i++) {
 			grayDiff.erode();
 		}
 
@@ -164,9 +174,9 @@ void ofApp::update() {
 			}
 		}
 
-		if (maxid >= 0) {
+		//if (maxid >= 0) {
 			//printf("x:%f,y:%f\n", contourFinder.blobs[maxid].centroid.x, contourFinder.blobs[maxid].centroid.y);
-		}
+		//}
 
 		unsigned char *diffPixs = grayDiff.getPixels();
 		unsigned char *colorPixs = colorImage.getPixels();
@@ -182,7 +192,6 @@ void ofApp::update() {
 				compositeImgPixels[3*i+2] = colorPixs[3*i+2];
 
 				//fs.push_back(FireBall(nPixs % WINDOW_W, nPixs / WINDOW_W));
-
 			}else{
 				compositeImgPixels[3*i] = 0;
 				compositeImgPixels[3*i+1] = 0;
@@ -205,6 +214,15 @@ void ofApp::update() {
 			//ofEllipse(contourFinder.blobs[i].centroid.x, contourFinder.blobs[i].centroid.y, 4, 4);
 			break;
 		}
+
+		if (maxid >= 0) {
+			cosmo.update(contourFinder.blobs[maxid].centroid);
+		}
+		else {
+			cosmo.update(ofPoint(WINDOW_H,WINDOW_W));
+		}
+
+		ab.update();
 	}
 
 
@@ -215,7 +233,7 @@ void ofApp::update() {
 void ofApp::draw() {
 
 	ofMatrix4x4 mat = warper.getMatrix();
-
+	AfterImage af;
 
 	displayfbo.begin();
 
@@ -238,7 +256,7 @@ void ofApp::draw() {
 		break;
 
 	case 4:
-		//差分のグレースーケル
+		//差分
 		maskImage.draw(0, 0);//(0, 0, ofGetWidth(), ofGetHeight());
 		break;
 
@@ -247,8 +265,29 @@ void ofApp::draw() {
 		drawAura();
 		break;
 	case 6:
-		ofBackground(0, 0, 0);
+		ofSetColor(0, 0, 0, 23);
+		ofRect(0, 0, ofGetWidth(), ofGetHeight());
+//		ofBackground(0, 0, 0);
 		drawAura();
+		break;
+	case 7:
+		//残像
+		ofSetColor(0, 0, 0, 5);
+		ofRect(0, 0, ofGetWidth(), ofGetHeight());
+		preAf.draw(ofGetFrameNum());
+		af.nPts = contourFinder.blobs[maxid].nPts;
+		af.pts = contourFinder.blobs[maxid].pts;
+		af.draw(0,0,0);
+		preAf.nPts = af.nPts;
+		preAf.pts = af.pts;
+		break;
+	case 8:
+		ofBackground(0, 0, 0);
+		cosmo.draw();
+		break;
+	case 9:
+		ofBackground(0, 0, 0);
+		ab.draw();
 		break;
 	default:
 		//カラー映像
@@ -461,6 +500,20 @@ void ofApp::keyPressed(int key) {
 			aura.push_back(auraCore);
 		}
 		videoMode = 6;
+		break;
+	case '7':
+		// AfterImage
+		videoMode = 7;
+		break;
+	case '8':
+		// Cosmo
+		videoMode = 8;
+		break;
+	case '9':
+		// Cosmo
+		// ２番めの引数はちゃんとかえるんだよ
+		ab.refresh(ofPoint(ofGetWindowWidth()/2, ofGetWindowHeight()+10.0), true);
+		videoMode = 9;
 		break;
 	case 'a':
 		//解析結果の表示の on / off

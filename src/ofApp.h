@@ -5,8 +5,10 @@
 #include "ofxOpenCv.h"
 #include "fireBall.h"
 #include "aura.h"
+#include "afterimage.h"
+#include "cosmo.h"
+#include "autoBuilder.h"
 #include <vector>
-
 
 class ofApp : public ofBaseApp {
 
@@ -62,6 +64,9 @@ private:
 
 	vector<FireBall> fs; 
 	vector<Aura> aura; //!< Kimrepo
+	AfterImage preAf;
+	Cosmo cosmo;
+	AutoBuilder ab;
 
 	int invisiCol;
 
