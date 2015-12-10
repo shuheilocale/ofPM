@@ -10,16 +10,18 @@ Dust::Dust(ofPoint _p, float _size) {
 	v = 0.3*size*ofRandom(1)*v.normalize(); //初期速度0.3
 	c = p;
 }
-void Dust::setup() {
 
+void Dust::setup() {
 	if (!img.loadImage("dust.png")) {
 		printf("image load error!!\n");
 	}
 }
 
+
 void Dust::draw() {
 	img.draw(p, 5 * size, 5 * size);
 };
+
 
 bool Dust::isDead() {
 	return (lt <= 0);
@@ -41,7 +43,7 @@ FugitiveDust::FugitiveDust(float x, float y) {
 	//size = 10; // ここで大きさを指定してやる
 }
 
-void FugitiveDust::setup(const ofPoint& _posR, const ofPoint& _posL, bool _RtoL) {
+void FugitiveDust::setup(const ofPoint& _posL, const ofPoint& _posR, bool _RtoL) {
 	posR = _posR;
 	posL = _posL;
 	RtoL = _RtoL;
@@ -100,12 +102,12 @@ void FugitiveDust::draw() {
 	}
 };
 
-void FugitiveDust::reflesh(const ofPoint& pos, bool R2L) {
+void FugitiveDust::refresh(const ofPoint& _posL, const ofPoint& _posR, bool _RtoL) {
 	ps.clear();
-	if (R2L) {
-		setup(pos, ofPoint(0, 0, pos.y), true);
+	if (_RtoL) {
+		setup(_posL, _posR, true);
 	}
 	else {
-		setup(ofPoint(0, 0, pos.y), pos, false);
+		setup(_posL, _posR, false);
 	}
 }

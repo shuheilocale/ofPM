@@ -34,9 +34,9 @@ class FugitiveDust {
 public:
 	FugitiveDust() {};
 	FugitiveDust(float x, float y);
-	void setup(const ofPoint& _posR, const ofPoint& _posL, bool _RtoL);
+	void setup(const ofPoint& _posL, const ofPoint& _posR, bool _RtoL);
 	void update();
-	void update(ofPoint _pos);
+	//void update(ofPoint _pos);
 	void draw();
-	void reflesh(const ofPoint& pos, bool R2L);
+	void refresh(const ofPoint& posL, const ofPoint& posR, bool R2L);
 };

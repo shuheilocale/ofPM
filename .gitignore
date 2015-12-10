@@ -15,6 +15,7 @@ build/
 [Bb]in/*
 [Oo]bj/
 ![Bb]in/data/
+[Bb]in/data/buildings
 
 # MSTest test Results
 [Tt]est[Rr]esult*/

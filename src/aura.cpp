@@ -74,7 +74,6 @@ void Aura::addAttraction(float px, float py, float radius, float strength) {
 void Aura::addRepulsion(ofxCvGrayscaleImage* diffImg, ofxCvBlob* blob, float radius, float strength) {
 
 	const unsigned char *diffPixs = diffImg->getPixels();
-	int nPixs = 640 * 480;
 
 	ofVec2f posOfForce;
 
@@ -84,10 +83,10 @@ void Aura::addRepulsion(ofxCvGrayscaleImage* diffImg, ofxCvBlob* blob, float rad
 	if (px < 0) px = 0;
 	if (py < 0) py = 0;
 
-	if (px > 640) px = 639;
-	if (py > 480) py = 479;
+	if (px > diffImg->getWidth()) px = diffImg->getWidth() -1 ;
+	if (py > diffImg->getHeight()) py = diffImg->getHeight() -1;
 
-	unsigned char mask = diffPixs[px + py * 640];
+	unsigned char mask = diffPixs[px + py * int(diffImg->getWidth())];
 	//printf("mask = %u\n", mask);
 
 	posOfForce.set(px, py);

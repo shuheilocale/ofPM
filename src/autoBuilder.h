@@ -27,9 +27,9 @@ class AutoBuilder
 			scale = _scale;
 			deg = _deg;
 			// とりあえずここで対応しとくガチ書きで。
-			char fname[_MAX_FNAME];
+			char fname[255]; // _MAX_PATHはwin専用
 			//printf("%s\n", fname);
-			int number = ofRandom(1,10);
+			int number = ofRandom(1,14); // ★ファイル数分だけ変える
 			sprintf(fname, "buildings/%02d.png", number);
 			if( !img.loadImage(fname) )
 			{
@@ -100,48 +100,65 @@ public:
 	AutoBuilder();
 	~AutoBuilder();
 
-	void setup( int num, const ofPoint& pos, bool R2L ) {
+	void setup( int num, const ofPoint& posL, const ofPoint& posR, bool R2L ) {
+		drawOk = posL != posR;
 		if (num == 0) return;
-		
+		buildings.clear();
 		startFrame = ofGetFrameNum();
 		delay = 10;
 
-		float step = pos.x / num;
-		for (int i = 0, len = num; i < len;++i) {
-			Building b;
-			
-			b.setup(ofPoint(pos.x - step*i + ofRandom(-10.0,10.0), pos.y ), ofRandom(0.1,0.5), 0 ); // 仮ぎめ
-			buildings.push_back(b);
-		}
-
-
+		//buildings.resize(num);
+		
+		float step = fabs(posR.x - posL.x) / num;
 		if (R2L) {
-			fd.setup(pos, ofPoint(0,0, pos.y), true);
+			for (int i = 0, len = num; i < len;++i) {
+				Building b;
+				b.setup(ofPoint(posR.x - step*i + ofRandom(-10.0, 10.0), posR.y), ofRandom(0.1, 0.5), 0); // 仮ぎめ
+				buildings.push_back(b);
+			}
+		}else{
+			for (int i = 0, len = num; i < len;++i) {
+				Building b;
+				b.setup(ofPoint(posL.x + step*i + ofRandom(-10.0, 10.0), posL.y), ofRandom(0.1, 0.5), 0); // 仮ぎめ
+				buildings.push_back(b);
+			}
 		}
-		else {
-			fd.setup(ofPoint(0, 0, pos.y), pos, false);
-		}
+
+		fd.setup(posR, posL, true);
 	}
 
-	void refresh(const ofPoint& pos, bool R2L) {
-		startFrame = ofGetFrameNum();
+	void refresh(const ofPoint& posL, const ofPoint& posR, bool R2L) {
+		drawOk = posL != posR;
+		if (buildings.empty()) return;
 		int num = buildings.size();
-		buildings.clear();
 
-		float step = pos.x / num;
-		for (int i = 0, len = num; i < len;++i) {
-			Building b;
+		//buildings.clear();
+		startFrame = ofGetFrameNum();
+		delay = 10;
 
-			b.setup(ofPoint(pos.x - step*i + ofRandom(-10.0, 10.0), pos.y), ofRandom(0.1, 0.5), 0); // 仮ぎめ
-			buildings.push_back(b);
+		float step = fabs(posR.x - posL.x) / num;
+		if (R2L) {
+			for (int i = 0, len = num; i < len;++i) {
+				Building b;
+				b.setup(ofPoint(posR.x - step*i + ofRandom(-10.0, 10.0), posR.y), ofRandom(0.1, 0.5), 0); // 仮ぎめ
+				//buildings.push_back(b);
+				buildings[i] = b;
+			}
+		}
+		else {
+			for (int i = 0, len = num; i < len;++i) {
+				Building b;
+				b.setup(ofPoint(posL.x + step*i + ofRandom(-10.0, 10.0), posL.y), ofRandom(0.1, 0.5), 0); // 仮ぎめ
+				buildings[i] =b;
+			}
 		}
 
-		fd.reflesh(pos, R2L);
+		fd.refresh(posL, posR, R2L);
 		
 	}
 
 	void update() {
-		
+
 		for (int i = 0, len = buildings.size(); i < len; ++i) {
 			if ( i*10 < ofGetFrameNum() - startFrame ) {
 				buildings[i].update();
@@ -154,6 +171,8 @@ public:
 	}
 
 	void draw() {
+		if (!drawOk) return;
+
 		for (int i = 0, len = buildings.size(); i < len; ++i) {
 			buildings[i].draw();
 		}
@@ -164,5 +183,6 @@ public:
 	int     delay;
 	uint64_t startFrame;
 	FugitiveDust fd;
+	bool drawOk;
 };
 

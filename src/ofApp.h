@@ -52,6 +52,9 @@ private:
 	ofxCvGrayscaleImage grayDiff; //現在の画像と背景との差分
 	ofxCvContourFinder contourFinder; //輪郭抽出のためのクラス
 	int maxid; // 輪郭抽出の最大面積を格納した番号（1フレーム毎に更新）
+	ofRectangle         preBoundingRect;
+	ofPoint				preCentroid;
+
 	float ratioW, ratioH;
 	ofFbo displayfbo;
 

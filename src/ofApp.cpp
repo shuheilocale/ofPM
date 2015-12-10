@@ -86,7 +86,7 @@ void ofApp::setup() {
 
 	cosmo.setup(20000);
 
-	ab.setup(10, ofPoint(ofGetWidth() / 2, ofGetHeight()+10.0), true);
+	ab.setup(10, ofPoint(0.0,0.0), ofPoint(0.0, 0.0), true);
 
 	printf("ogww:%f, ogww:%f\n", ofGetWidth(), ofGetWindowWidth());
 
@@ -126,7 +126,7 @@ void ofApp::update() {
 	camera.update();
 	//新規にフレームが切り替わったか判定
 	bNewFrame = camera.isFrameNew();
-
+	maxid = -1;
 	//フレームが切り替わった際のみ画像を解析
 	if (bNewFrame) {
 		//取り込んだフレームを画像としてキャプチャ
@@ -166,7 +166,6 @@ void ofApp::update() {
 		//2値化した画像から輪郭を抽出する
 		contourFinder.findContours(grayDiff, 25, grayDiff.width * grayDiff.height, 10, false, false);
 		float maxarea = 0.0;
-		maxid = -1;
 		for (int i = 0; i < contourFinder.nBlobs; i++) {
 			if (maxarea < contourFinder.blobs[i].area) {
 				maxarea = contourFinder.blobs[i].area;
@@ -286,9 +285,25 @@ void ofApp::draw() {
 		cosmo.draw();
 		break;
 	case 9:
+	{
 		ofBackground(0, 0, 0);
+		if (maxid >= 0) {
+			const ofRectangle& curBoundingRect = contourFinder.blobs[maxid].boundingRect;
+			//printf("x/y = %f\n", (curBoundingRect.width / preBoundingRect.width));
+			if ((curBoundingRect.width / preBoundingRect.width) > 1.3) {
+				bool R2L = contourFinder.blobs[maxid].centroid.x < preCentroid.x;
+				//ab.refresh(contourFinder.blobs[maxid].centroid, R2L);
+				if (R2L) {
+					ab.refresh(ofPoint(0, ofGetHeight()), ofPoint(contourFinder.blobs[maxid].centroid.x, ofGetHeight()), true);
+				}
+				else {
+					ab.refresh(ofPoint(contourFinder.blobs[maxid].centroid.x, ofGetHeight()), ofPoint(ofGetWindowWidth(), ofGetHeight()), false);
+				}
+			}
+		}
 		ab.draw();
 		break;
+	}
 	default:
 		//カラー映像
 		colorImage.draw(0, 0);//(0, 0, ofGetWidth(), ofGetHeight());
@@ -297,6 +312,11 @@ void ofApp::draw() {
 			it->draw();
 		}
 		break;
+	}
+
+	if (maxid >= 0) {
+		preBoundingRect = contourFinder.blobs[maxid].boundingRect;
+		preCentroid = contourFinder.blobs[maxid].centroid;
 	}
 
 	//画面に対する映像の比率を計算
@@ -512,7 +532,7 @@ void ofApp::keyPressed(int key) {
 	case '9':
 		// Cosmo
 		// ２番めの引数はちゃんとかえるんだよ
-		ab.refresh(ofPoint(ofGetWindowWidth()/2, ofGetWindowHeight()+10.0), true);
+		//ab.refresh( ofPoint(ofGetWindowWidth()/2, ofGetWindowHeight()+10.0), true);
 		videoMode = 9;
 		break;
 	case 'a':
