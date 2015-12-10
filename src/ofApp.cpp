@@ -87,6 +87,9 @@ void ofApp::setup() {
 	corners[2].set(camera.getWidth(), camera.getHeight());
 	corners[3].set(0, camera.getHeight());
 
+	existsCornes = 0;
+	selectedCornerCalib = -1;
+
 	cosmo.setup(1000);
 
 	ab.setup(10, ofPoint(0.0,0.0), ofPoint(0.0, 0.0), true);
@@ -243,10 +246,13 @@ void ofApp::update() {
 
 //--------------------------------------------------------------
 void ofApp::draw() {
+
+	
 	/* 物体認識されなかったら思い切って描画しないっていう */
 	if (maxid < 0) {
 		return;
 	}
+	ofBackground(0, 0, 0);
 
 	ofMatrix4x4 mat = warper.getMatrix();
 	AfterImage af;
@@ -403,6 +409,12 @@ void ofApp::draw() {
 	ofPopMatrix();
 
 
+	if (!displayCalib) {
+		ofSetColor(ofColor::black);
+		for (int i = 0; i < existsCornes; ++i) {
+			ofCircle(cornersCalib[i].x, cornersCalib[i].y, 5);
+		}
+	}
 	
 	ofSetColor(ofColor::magenta);
 	warper.drawQuadOutline();
@@ -617,6 +629,67 @@ void ofApp::keyPressed(int key) {
 	case 'h':
 		warper.toggleShow();
 		break;
+	case 'c':
+		static bool c = false;
+		if (!displayCalib) {
+			if (existsCornes == 4) {
+				
+				ofPoint rt, rb, lt, lb;
+				
+				rt = cornersCalib[0];
+				rb = cornersCalib[0];
+				lt = cornersCalib[0];
+				lb = cornersCalib[0];
+
+				float distRt = lt.distance(ofPoint(0, 0));
+				float distRb = lb.distance(ofPoint(0, ofGetHeight()));
+				float distLt = rt.distance(ofPoint(ofGetWidth(), 0));
+				float distLb = rb.distance(ofPoint(ofGetWidth(), ofGetHeight()));
+				for (int i = 1; i < existsCornes; ++i) {
+					if (distRt > cornersCalib[i].distance(ofPoint(0, 0))) {
+						distRt = cornersCalib[i].distance(ofPoint(0, 0));
+						lt = cornersCalib[i];
+					}
+					else if (distRb > cornersCalib[i].distance(ofPoint(0, ofGetHeight()))) {
+						distRb = cornersCalib[i].distance(ofPoint(0, ofGetHeight()));
+						lb = cornersCalib[i];
+					}
+					else if (distLt > cornersCalib[i].distance(ofPoint(ofGetWidth(), 0))) {
+						distRt = cornersCalib[i].distance(ofPoint(ofGetWidth(), 0));
+						rt = cornersCalib[i];
+					}
+					else if (distLb > cornersCalib[i].distance(ofPoint(ofGetWidth(), ofGetHeight()))) {
+						distLb = cornersCalib[i].distance(ofPoint(ofGetWidth(), ofGetHeight()));
+						rb = cornersCalib[i];
+					}
+				}
+
+				/*
+				float minX = cornersCalib[0].x, minY = cornersCalib[0].y, maxX = cornersCalib[0].x, maxY = cornersCalib[0].y;
+
+				for (int i = 1; i < existsCornes; ++i) {
+					if (minX > cornersCalib[i].x) { minX = cornersCalib[i].x; }
+					if (minY > cornersCalib[i].y) { minY = cornersCalib[i].y; }
+					if (maxX < cornersCalib[i].x) { maxX = cornersCalib[i].x; }
+					if (maxY < cornersCalib[i].y) { maxY = cornersCalib[i].y; }
+				}
+				*/
+
+				vector<ofPoint> points;
+				points.push_back(lt);
+				points.push_back(rt);
+				points.push_back(rb);
+				points.push_back(lb);
+				warper.setSourcePoints(points);
+			}
+		}
+		else {
+			warper.setSourceRect(ofRectangle(0, 0, ofGetWindowWidth(), ofGetWindowHeight()));
+		}
+
+		displayCalib = !displayCalib;
+
+		break;
 	}
 }
 
@@ -633,6 +706,7 @@ void ofApp::mouseMoved(int x, int y) {
 //--------------------------------------------------------------
 void ofApp::mouseDragged(int x, int y, int button) {
 	corners[selectedCorner].set(x - 30, y - 30);
+	cornersCalib[selectedCornerCalib].set(x, y);
 }
 
 //--------------------------------------------------------------
@@ -643,11 +717,23 @@ void ofApp::mousePressed(int x, int y, int button) {
 			selectedCorner = i;
 		}
 	}
+
+	if (existsCornes < 4) {
+		cornersCalib[existsCornes].set(x, y);
+		existsCornes++;
+	}
+	for (int i = 0; i<existsCornes; i++) {
+		if (ofDist(cornersCalib[i].x, cornersCalib[i].y, x , y )<10) {
+			selectedCornerCalib = i;
+		}
+	}
+
 }
 
 //--------------------------------------------------------------
 void ofApp::mouseReleased(int x, int y, int button) {
 	selectedCorner = -1;
+	selectedCornerCalib = -1;
 }
 
 //--------------------------------------------------------------
@@ -681,49 +767,4 @@ void ofApp::gotMessage(ofMessage msg) {
 //--------------------------------------------------------------
 void ofApp::dragEvent(ofDragInfo dragInfo) {
 
-}
-
-ofPoint ofApp::ofxLerp(ofPoint start, ofPoint end, float amt) {
-	return start + amt * (end - start);
-}
-
-//--------------------------------------------------------------
-int ofApp::ofxIndex(float x, float y, float w) {
-	return y*w + x;
-}
-
-//--------------------------------------------------------------
-void ofApp::ofxQuadWarp_(ofBaseHasTexture &tex, ofPoint lt, ofPoint rt, ofPoint rb, ofPoint lb, int rows, int cols) {
-
-	float tw = tex.getTexture().getWidth();//.getTextureReference().getWidth();
-	float th = tex.getTexture().getHeight();//getTextureReference().getHeight();
-
-	ofMesh mesh;
-
-	for (int x = 0; x <= cols; x++) {
-		float f = float(x) / cols;
-		ofPoint vTop(ofxLerp(lt, rt, f));
-		ofPoint vBottom(ofxLerp(lb, rb, f));
-		ofPoint tTop(ofxLerp(ofPoint(0, 0), ofPoint(tw, 0), f));
-		ofPoint tBottom(ofxLerp(ofPoint(0, th), ofPoint(tw, th), f));
-
-		for (int y = 0; y <= rows; y++) {
-			float f = float(y) / rows;
-			ofPoint v = ofxLerp(vTop, vBottom, f);
-			mesh.addVertex(v);
-			mesh.addTexCoord(ofxLerp(tTop, tBottom, f));
-		}
-	}
-
-	for (float y = 0; y<rows; y++) {
-		for (float x = 0; x<cols; x++) {
-			mesh.addTriangle(ofxIndex(x, y, cols + 1), ofxIndex(x + 1, y, cols + 1), ofxIndex(x, y + 1, cols + 1));
-			mesh.addTriangle(ofxIndex(x + 1, y, cols + 1), ofxIndex(x + 1, y + 1, cols + 1), ofxIndex(x, y + 1, cols + 1));
-		}
-	}
-
-	tex.getTexture().bind();
-	mesh.draw();
-	tex.getTexture().unbind();
-	mesh.drawVertices();
 }
