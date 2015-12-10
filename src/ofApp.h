@@ -54,6 +54,10 @@ private:
 	int maxid; // 輪郭抽出の最大面積を格納した番号（1フレーム毎に更新）
 	ofRectangle         preBoundingRect;
 	ofPoint				preCentroid;
+	
+	bool				preBlobsExist;
+	vector<ofxCvBlob>	preBlobs;
+	int preMaxid;
 
 	float ratioW, ratioH;
 	ofFbo displayfbo;

@@ -13,12 +13,22 @@ public:
 	class CosmoUnit {
 
 	public:
+		static ofImage aramaki;
+		static ofImage teshima;
+		static ofImage maeda;
 		ofPoint pos;
 		float radius;
+		int  idx;
 		//int   alpha;
 		ofColor color;
 
 		CosmoUnit() {
+		}
+
+		static void loadImage() {
+			aramaki.loadImage("faces/aramaki.png");
+			teshima.loadImage("faces/teshima.png");
+			maeda.loadImage("faces/maeda.png");
 		}
 
 		void setup(int x, int y, float _radius, const ofColor& _color) {
@@ -27,6 +37,7 @@ public:
 			radius = _radius;
 			//alpha = _alpha;
 			color = _color;
+			idx = ofRandom(0, 2.99);
 		}
 
 		void updateAbs(float x, float y) {
@@ -34,14 +45,20 @@ public:
 			pos.y = y;
 		}
 
-		void update(float x, float y) {
+		void update(float x, float y, float _radius) {
 			pos.x += x;
 			pos.y += y;
+			radius = _radius;
 		}
 
 		void draw() {
 			ofSetColor(color);
-			ofCircle(pos.x, pos.y, radius);
+
+			
+			if (idx == 0) { aramaki.draw(pos, radius, radius); }
+			else if (idx == 1) { teshima.draw(pos, radius, radius); }
+			else { maeda.draw(pos, radius, radius); }
+//			ofCircle(pos.x, pos.y, radius);
 		}
 	};
 
@@ -51,10 +68,10 @@ public:
 	~Cosmo() {};
 
 	void setup(int cosmoUnitNum ){
+		CosmoUnit::loadImage();
 		for (int i = 0; i < cosmoUnitNum;i++) {
-
 			CosmoUnit cu;
-			cu.setup(ofRandom(ofGetWindowWidth()), ofRandom(ofGetWindowHeight()), ofRandom(0.5, 3.0), ofColor(255, 255, 255, ofRandom(10, 255)));
+			cu.setup(ofRandom(ofGetWindowWidth()), ofRandom(ofGetWindowHeight()), ofRandom(5.0, 50.0), ofColor(255, 255, 255, ofRandom(10, 255)));
 			cosmos.push_back(cu);
 		}
 	}
@@ -65,7 +82,7 @@ public:
 			ofVec2f directionVec = center - cosmos[i].pos;
 			float dist = center.distance(cosmos[i].pos);
 			directionVec.normalize();
-			cosmos[i].update(directionVec.x / dist *1000, directionVec.y / dist *1000);
+			cosmos[i].update(directionVec.x / dist *1000, directionVec.y / dist *1000, cosmos[i].radius);
 		}
 
 	}

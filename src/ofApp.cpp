@@ -72,6 +72,9 @@ void ofApp::setup() {
 	showBenchmark = false;
 	threshold = 20;
 	videoMode = 0;
+
+	preBlobsExist = false;
+	preMaxid = -1;
 	
 	ParticleOrb::setup();
 	for (int i = 1; i < 2; i++) {
@@ -84,7 +87,7 @@ void ofApp::setup() {
 	corners[2].set(camera.getWidth(), camera.getHeight());
 	corners[3].set(0, camera.getHeight());
 
-	cosmo.setup(20000);
+	cosmo.setup(1000);
 
 	ab.setup(10, ofPoint(0.0,0.0), ofPoint(0.0, 0.0), true);
 
@@ -173,6 +176,12 @@ void ofApp::update() {
 			}
 		}
 
+		if ( maxid >= 0) {
+			preBlobs = contourFinder.blobs;
+			preBlobsExist = true;
+			preMaxid = true;
+		}
+
 		//if (maxid >= 0) {
 			//printf("x:%f,y:%f\n", contourFinder.blobs[maxid].centroid.x, contourFinder.blobs[maxid].centroid.y);
 		//}
@@ -217,7 +226,11 @@ void ofApp::update() {
 		if (maxid >= 0) {
 			cosmo.update(contourFinder.blobs[maxid].centroid);
 		}
-		else {
+		else if (preBlobsExist) {
+			cosmo.update(preBlobs[preMaxid].centroid);
+
+		}else {
+
 			cosmo.update(ofPoint(WINDOW_H,WINDOW_W));
 		}
 
@@ -230,6 +243,10 @@ void ofApp::update() {
 
 //--------------------------------------------------------------
 void ofApp::draw() {
+	/* 物体認識されなかったら思い切って描画しないっていう */
+	if (maxid < 0) {
+		return;
+	}
 
 	ofMatrix4x4 mat = warper.getMatrix();
 	AfterImage af;
@@ -271,14 +288,26 @@ void ofApp::draw() {
 		break;
 	case 7:
 		//残像
-		ofSetColor(0, 0, 0, 5);
-		ofRect(0, 0, ofGetWidth(), ofGetHeight());
-		preAf.draw(ofGetFrameNum());
-		af.nPts = contourFinder.blobs[maxid].nPts;
-		af.pts = contourFinder.blobs[maxid].pts;
-		af.draw(0,0,0);
-		preAf.nPts = af.nPts;
-		preAf.pts = af.pts;
+		if (maxid >= 0) {
+			ofSetColor(0, 0, 0, 5);
+			ofRect(0, 0, ofGetWidth(), ofGetHeight());
+			preAf.draw(ofGetFrameNum());
+			af.nPts = contourFinder.blobs[maxid].nPts;
+			af.pts = contourFinder.blobs[maxid].pts;
+			af.draw(0, 0, 0);
+			preAf.nPts = af.nPts;
+			preAf.pts = af.pts;
+		}
+		else if (preBlobsExist) {
+			ofSetColor(0, 0, 0, 5);
+			ofRect(0, 0, ofGetWidth(), ofGetHeight());
+			preAf.draw(ofGetFrameNum());
+			af.nPts = preBlobs[preMaxid].nPts;
+			af.pts = preBlobs[preMaxid].pts;
+			af.draw(0, 0, 0);
+			preAf.nPts = af.nPts;
+			preAf.pts = af.pts;
+		}
 		break;
 	case 8:
 		ofBackground(0, 0, 0);
@@ -286,8 +315,8 @@ void ofApp::draw() {
 		break;
 	case 9:
 	{
-		ofBackground(0, 0, 0);
 		if (maxid >= 0) {
+			ofBackground(0, 0, 0);
 			const ofRectangle& curBoundingRect = contourFinder.blobs[maxid].boundingRect;
 			//printf("x/y = %f\n", (curBoundingRect.width / preBoundingRect.width));
 			if ((curBoundingRect.width / preBoundingRect.width) > 1.3) {
@@ -318,10 +347,16 @@ void ofApp::draw() {
 		preBoundingRect = contourFinder.blobs[maxid].boundingRect;
 		preCentroid = contourFinder.blobs[maxid].centroid;
 	}
+	else if (preMaxid) {
+		preBoundingRect = preBlobs[preMaxid].boundingRect;
+		preCentroid = preBlobs[preMaxid].centroid;
+	}
 
 	//画面に対する映像の比率を計算
 	float ratioX = ofGetWidth() / WINDOW_W;
 	float ratioY = ofGetHeight() / WINDOW_H;
+
+
 
 	//解析結果を表示する場合
 	if (showCvAnalysis) {
@@ -334,7 +369,15 @@ void ofApp::draw() {
 			ofEllipse(contourFinder.blobs[maxid].centroid.x*ratioW, contourFinder.blobs[maxid].centroid.y*ratioW, 4, 4);
 			ofPopMatrix();
 		}
-
+		else if(preBlobsExist){
+			ofPushMatrix();
+			glScalef(ratioX, ratioY, 1.0f);
+			contourFinder.blobs[maxid].draw(0, 0);
+			//ofFill();
+			ofSetColor(255, 0, 0);
+			ofEllipse(preBlobs[preMaxid].centroid.x*ratioW, preBlobs[preMaxid].centroid.y*ratioW, 4, 4);
+			ofPopMatrix();
+		}
 		//検出した解析結果を表示
 		/*for (int i = 0; i < contourFinder.nBlobs; i++) {
 			
