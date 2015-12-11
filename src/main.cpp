@@ -11,7 +11,7 @@ int main( ){
 	// can be OF_WINDOW or OF_FULLSCREEN
 	// pass in width and height too:
 	ofAppGLFWWindow win;
-	win.setMultiDisplayFullscreen(true);
+	//win.setMultiDisplayFullscreen(true);
 	ofSetupOpenGL(640, 480, OF_WINDOW);
 	//ofSetupOpenGL(&win, 640, 480, OF_FULLSCREEN);
 	ofRunApp(new ofApp());

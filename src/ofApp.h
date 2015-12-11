@@ -14,8 +14,13 @@ class ofApp : public ofBaseApp {
 
 public:
 
-	static const unsigned int WINDOW_W = 640;
-	static const unsigned int WINDOW_H = 480;
+	//static const unsigned int WINDOW_W = 640;
+	//static const unsigned int WINDOW_H = 480;
+	static const unsigned int CAMERA_W = 640;
+	static const unsigned int CAMERA_H = 480;
+
+	int width;
+	int height;
 
 	
 	ofPoint corners[4];

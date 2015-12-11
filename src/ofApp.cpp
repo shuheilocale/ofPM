@@ -17,9 +17,12 @@ void ofApp::setup() {
 	ofDisableBlendMode();
 	ofEnableBlendMode(OF_BLENDMODE_ADD);
 
+	width = ofGetWindowWidth();
+	height = ofGetWindowHeight();
+
 	for (int i = 0; i < 25000; i++) {
 		Aura auraCore;
-		auraCore.setInitCondition(ofRandom(WINDOW_W), ofRandom(WINDOW_H), 0, 0);
+		auraCore.setInitCondition(ofRandom(width), ofRandom(height), 0, 0);
 		auraCore.damping = ofRandom(0.01, 0.05);
 		aura.push_back(auraCore);
 	}
@@ -42,9 +45,9 @@ void ofApp::setup() {
 
 
 
-	fboBlurOnePass.allocate(ofGetWindowWidth(), ofGetWindowHeight(), GL_RGBA);
-	fboBlurTwoPass.allocate(ofGetWindowWidth(), ofGetWindowHeight(), GL_RGBA);
-	drawParticles.allocate(ofGetWindowWidth(), ofGetWindowHeight(), GL_RGBA);
+	fboBlurOnePass.allocate(width, height, GL_RGBA);
+	fboBlurTwoPass.allocate(width, height, GL_RGBA);
+	drawParticles.allocate(width, height, GL_RGBA);
 
 
 	// basic setting
@@ -56,19 +59,19 @@ void ofApp::setup() {
 
 	//カメラから映像を取り込んで表示
 	camera.setVerbose(true);
-	camera.initGrabber(WINDOW_W, WINDOW_H);
+	camera.initGrabber(CAMERA_W, CAMERA_H);
 
 	//使用する画像の領域を確保
-	colorImage.allocate(WINDOW_W, WINDOW_H);
-	grayImage.allocate(WINDOW_W, WINDOW_H);
-	grayBg.allocate(WINDOW_W, WINDOW_H);
-	grayDiff.allocate(WINDOW_W, WINDOW_H);
+	colorImage.allocate(CAMERA_W, CAMERA_H);
+	grayImage.allocate(CAMERA_W, CAMERA_H);
+	grayBg.allocate(CAMERA_W, CAMERA_H);
+	grayDiff.allocate(CAMERA_W, CAMERA_H);
 	// todo ↑ウィンドウ引き伸ばしに対応
 
 	//変数の初期化
 	bLearnBakground = true;
 	showCvAnalysis = false;
-	showFullScreen = false;
+	showFullScreen = true;
 	showBenchmark = false;
 	threshold = 20;
 	videoMode = 0;
@@ -78,15 +81,16 @@ void ofApp::setup() {
 	
 	ParticleOrb::setup();
 	for (int i = 1; i < 2; i++) {
-		fs.push_back(FireBall(ofGetWidth() / i, ofGetHeight() / i));
+		fs.push_back(FireBall(width / i, height / i));
 	}
 
+	/*
 	selectedCorner = -1;
 	corners[0].set(0, 0);
-	corners[1].set(camera.getWidth(), 0);
-	corners[2].set(camera.getWidth(), camera.getHeight());
-	corners[3].set(0, camera.getHeight());
-
+	corners[1].set(width, 0);
+	corners[2].set(width, height);
+	corners[3].set(0, height);
+	*/
 	existsCornes = 0;
 	selectedCornerCalib = -1;
 
@@ -94,18 +98,18 @@ void ofApp::setup() {
 
 	ab.setup(10, ofPoint(0.0,0.0), ofPoint(0.0, 0.0), true);
 
-	printf("ogww:%f, ogww:%f\n", ofGetWidth(), ofGetWindowWidth());
+	//printf("ogww:%f, ogww:%f\n", ofGetWidth(), ofGetWindowWidth());
 
-	int x = (ofGetWidth() - camera.getWidth()) * 0.5;       // center on screen.
-	int y = (ofGetHeight() - camera.getHeight()) * 0.5;     // center on screen.
+	int x = 0;//(ofGetWidth() - camera.getWidth()) * 0.5;       // center on screen.
+	int y = 0;//(ofGetHeight() - camera.getHeight()) * 0.5;     // center on screen.
 	//int x = ofGetWindowWidth() * 0.5;
 	//int y = ofGetWindowHeight() * 0.5;
 	//int w = camera.getWidth();
 	//int h = camera.getHeight();
-	int w = ofGetWindowWidth();
-	int h = ofGetWindowHeight();
+	int w = width;
+	int h = height;//ofGetWindowHeight();
 
-	displayfbo.allocate(ofGetWindowWidth(), ofGetWindowHeight());
+	displayfbo.allocate(width, height);
 
 	warper.setSourceRect(ofRectangle(0, 0, w, h));              // this is the source rectangle which is the size of the image and located at ( 0, 0 )
 	warper.setTopLeftCornerPosition(ofPoint(x, y));             // this is position of the quad warp corners, centering the image on the screen.
@@ -121,6 +125,7 @@ void ofApp::setup() {
 //--------------------------------------------------------------
 void ofApp::update() {
 
+	printf("window:%d\n", ofGetWindowWidth());
 	for (vector<FireBall>::iterator it = fs.begin(); it != fs.end(); ++it) {
 		it->update();
 	}
@@ -135,8 +140,8 @@ void ofApp::update() {
 	maxid = -1;
 	//フレームが切り替わった際のみ画像を解析
 	if (bNewFrame) {
-		//取り込んだフレームを画像としてキャプチャ
-		colorImage.setFromPixels(camera.getPixels(), WINDOW_W, WINDOW_H);
+		//取り込んだフレームを画像としてキャプチャ　★
+		colorImage.setFromPixels(camera.getPixels(), CAMERA_W, CAMERA_H);
 		//左右反転
 		colorImage.mirror(false, false);
 
@@ -182,7 +187,7 @@ void ofApp::update() {
 		if ( maxid >= 0) {
 			preBlobs = contourFinder.blobs;
 			preBlobsExist = true;
-			preMaxid = true;
+			preMaxid = maxid;
 		}
 
 		//if (maxid >= 0) {
@@ -192,7 +197,7 @@ void ofApp::update() {
 		unsigned char *diffPixs = grayDiff.getPixels();
 		unsigned char *colorPixs = colorImage.getPixels();
 
-		int nPixs = WINDOW_W * WINDOW_H;
+		int nPixs = CAMERA_W * CAMERA_H;
 
 		unsigned char* compositeImgPixels = new unsigned char[nPixs * 3];
 		
@@ -212,7 +217,7 @@ void ofApp::update() {
 			}
 		}
 		
-		maskImage.setFromPixels(compositeImgPixels, WINDOW_W, WINDOW_H);
+		maskImage.setFromPixels(compositeImgPixels, CAMERA_W, CAMERA_H);
 
 		delete[] compositeImgPixels;
 
@@ -234,7 +239,7 @@ void ofApp::update() {
 
 		}else {
 
-			cosmo.update(ofPoint(WINDOW_H,WINDOW_W));
+			cosmo.update(ofPoint(width/2,height/2));
 		}
 
 		ab.update();
@@ -288,7 +293,7 @@ void ofApp::draw() {
 		break;
 	case 6:
 		ofSetColor(0, 0, 0, 23);
-		ofRect(0, 0, ofGetWidth(), ofGetHeight());
+		ofRect(0, 0, width, height);
 //		ofBackground(0, 0, 0);
 		drawAura();
 		break;
@@ -296,17 +301,17 @@ void ofApp::draw() {
 		//残像
 		if (maxid >= 0) {
 			ofSetColor(0, 0, 0, 5);
-			ofRect(0, 0, ofGetWidth(), ofGetHeight());
+			ofRect(0, 0, CAMERA_W, CAMERA_H);
 			preAf.draw(ofGetFrameNum());
 			af.nPts = contourFinder.blobs[maxid].nPts;
 			af.pts = contourFinder.blobs[maxid].pts;
-			af.draw(0, 0, 0);
+			af.draw(0, 0, 0); // 自分は黒貫
 			preAf.nPts = af.nPts;
 			preAf.pts = af.pts;
 		}
 		else if (preBlobsExist) {
 			ofSetColor(0, 0, 0, 5);
-			ofRect(0, 0, ofGetWidth(), ofGetHeight());
+			ofRect(0, 0, width, height);
 			preAf.draw(ofGetFrameNum());
 			af.nPts = preBlobs[preMaxid].nPts;
 			af.pts = preBlobs[preMaxid].pts;
@@ -329,10 +334,10 @@ void ofApp::draw() {
 				bool R2L = contourFinder.blobs[maxid].centroid.x < preCentroid.x;
 				//ab.refresh(contourFinder.blobs[maxid].centroid, R2L);
 				if (R2L) {
-					ab.refresh(ofPoint(0, ofGetHeight()), ofPoint(contourFinder.blobs[maxid].centroid.x, ofGetHeight()), true);
+					ab.refresh(ofPoint(0, CAMERA_H), ofPoint(contourFinder.blobs[maxid].centroid.x, CAMERA_H), true);
 				}
 				else {
-					ab.refresh(ofPoint(contourFinder.blobs[maxid].centroid.x, ofGetHeight()), ofPoint(ofGetWindowWidth(), ofGetHeight()), false);
+					ab.refresh(ofPoint(contourFinder.blobs[maxid].centroid.x, CAMERA_H), ofPoint(CAMERA_W, CAMERA_H), false);
 				}
 			}
 		}
@@ -359,9 +364,8 @@ void ofApp::draw() {
 	}
 
 	//画面に対する映像の比率を計算
-	float ratioX = ofGetWidth() / WINDOW_W;
-	float ratioY = ofGetHeight() / WINDOW_H;
-
+	float ratioX = ofGetWidth() / width;
+	float ratioY = ofGetHeight() / height;
 
 
 	//解析結果を表示する場合
@@ -405,7 +409,7 @@ void ofApp::draw() {
 
 	ofPushMatrix();
 	ofMultMatrix(mat);
-	displayfbo.draw(0, 0);
+	displayfbo.draw(0, 0,width,height);
 	ofPopMatrix();
 
 
@@ -415,7 +419,7 @@ void ofApp::draw() {
 			ofCircle(cornersCalib[i].x, cornersCalib[i].y, 5);
 		}
 	}
-	
+	/*
 	ofSetColor(ofColor::magenta);
 	warper.drawQuadOutline();
 
@@ -427,7 +431,7 @@ void ofApp::draw() {
 
 	ofSetColor(ofColor::red);
 	warper.drawSelectedCorner();
-	
+	*/
 	ofSetColor(255, 255, 255);
 
 	if (showBenchmark) {
@@ -559,7 +563,7 @@ void ofApp::keyPressed(int key) {
 		aura.clear();
 		for (int i = 0; i < 25000; i++) {
 			Aura auraCore;
-			auraCore.setInitCondition(ofRandom(WINDOW_W), ofRandom(WINDOW_H), 0, 0);
+			auraCore.setInitCondition(ofRandom(width), ofRandom(height), 0, 0);
 			auraCore.damping = ofRandom(0.01, 0.05);
 			aura.push_back(auraCore);
 		}
@@ -570,7 +574,7 @@ void ofApp::keyPressed(int key) {
 		aura.clear();
 		for (int i = 0; i < 25000; i++) {
 			Aura auraCore;
-			auraCore.setInitCondition(ofRandom(WINDOW_W), ofRandom(WINDOW_H), 0, 0);
+			auraCore.setInitCondition(ofRandom(width), ofRandom(height), 0, 0);
 			auraCore.damping = ofRandom(0.01, 0.05);
 			aura.push_back(auraCore);
 		}
@@ -598,7 +602,7 @@ void ofApp::keyPressed(int key) {
 	case 'f':
 		//フルスクリーンに
 		ofSetFullscreen(showFullScreen);
-		showFullScreen ? showFullScreen = false : showFullScreen = true;
+		showFullScreen = !showFullScreen;
 		break;
 	case 'b':
 		//ベンチマーク
@@ -634,8 +638,15 @@ void ofApp::keyPressed(int key) {
 		if (!displayCalib) {
 			if (existsCornes == 4) {
 				
-				ofPoint rt, rb, lt, lb;
 				
+				ofPoint rt, rb, lt, lb;
+				lt = cornersCalib[0];
+				rt = cornersCalib[1];
+				rb = cornersCalib[2];
+				lb = cornersCalib[3];
+
+
+				/*
 				rt = cornersCalib[0];
 				rb = cornersCalib[0];
 				lt = cornersCalib[0];
@@ -663,6 +674,7 @@ void ofApp::keyPressed(int key) {
 						rb = cornersCalib[i];
 					}
 				}
+				*/
 
 				/*
 				float minX = cornersCalib[0].x, minY = cornersCalib[0].y, maxX = cornersCalib[0].x, maxY = cornersCalib[0].y;
@@ -684,7 +696,7 @@ void ofApp::keyPressed(int key) {
 			}
 		}
 		else {
-			warper.setSourceRect(ofRectangle(0, 0, ofGetWindowWidth(), ofGetWindowHeight()));
+			warper.setSourceRect(ofRectangle(0, 0, width, height));
 		}
 
 		displayCalib = !displayCalib;
@@ -705,18 +717,18 @@ void ofApp::mouseMoved(int x, int y) {
 
 //--------------------------------------------------------------
 void ofApp::mouseDragged(int x, int y, int button) {
-	corners[selectedCorner].set(x - 30, y - 30);
+	//corners[selectedCorner].set(x - 30, y - 30);
 	cornersCalib[selectedCornerCalib].set(x, y);
 }
 
 //--------------------------------------------------------------
 void ofApp::mousePressed(int x, int y, int button) {
-	selectedCorner = -1;
+	/*selectedCorner = -1;
 	for (int i = 0; i<4; i++) {
 		if (ofDist(corners[i].x, corners[i].y, x - 30, y - 30)<10) {
 			selectedCorner = i;
 		}
-	}
+	}*/
 
 	if (existsCornes < 4) {
 		cornersCalib[existsCornes].set(x, y);
@@ -748,8 +760,19 @@ void ofApp::mouseExited(int x, int y) {
 
 //--------------------------------------------------------------
 void ofApp::windowResized(int w, int h) {
-	ratioW = w / WINDOW_W;
-	ratioH = h / WINDOW_H;
+	width = w;
+	height = h;
+	ratioW = w / width;
+	ratioH = h / height;
+
+	int x = 0, y = 0;
+	warper.setSourceRect(ofRectangle(0, 0, w, h));              // this is the source rectangle which is the size of the image and located at ( 0, 0 )
+	warper.setTopLeftCornerPosition(ofPoint(x, y));             // this is position of the quad warp corners, centering the image on the screen.
+	warper.setTopRightCornerPosition(ofPoint(x + w, y));        // this is position of the quad warp corners, centering the image on the screen.
+	warper.setBottomLeftCornerPosition(ofPoint(x, y + h));      // this is position of the quad warp corners, centering the image on the screen.
+	warper.setBottomRightCornerPosition(ofPoint(x + w, y + h)); // this is position of the quad warp corners, centering the image on the screen.
+	//warper.setup();
+
 
 	/*
 	colorImage.resize(w, h);

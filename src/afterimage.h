@@ -62,9 +62,16 @@ public:
 		ofEndShape(true);
 	}
 
+	void ofSetHexColor(int hexColor, int alpha) {
+		int r = (hexColor >> 16) & 0xff;
+		int g = (hexColor >> 8) & 0xff;
+		int b = (hexColor >> 0) & 0xff;
+		ofSetColor(r, g, b, alpha);
+	}
+
 	void draw(int frameNum) {
 		ofFill();
-		ofSetHexColor(HexColorByFrameNum(frameNum));
+		ofSetHexColor(HexColorByFrameNum(frameNum), 200);
 		ofBeginShape();
 		for (int i = 0; i < nPts; i++) {
 			ofVertex(pts[i].x, pts[i].y);
