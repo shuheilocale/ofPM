@@ -125,7 +125,7 @@ void ofApp::setup() {
 //--------------------------------------------------------------
 void ofApp::update() {
 
-	printf("window:%d\n", ofGetWindowWidth());
+	//printf("window:%d\n", ofGetWindowWidth());
 	for (vector<FireBall>::iterator it = fs.begin(); it != fs.end(); ++it) {
 		it->update();
 	}
